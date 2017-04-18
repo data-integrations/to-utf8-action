@@ -54,6 +54,8 @@ public class ToUTF8ConfigTest {
   public void testSingleFile() throws Exception {
     URL iso88591File = this.getClass().getResource(ISO_8859_FILE_NAME);
     File destFolder = temporaryFolder.newFolder();
+    System.out.println("Source Path: " + iso88591File.getFile());
+    System.out.println("Dest Path: " + destFolder.getPath() + UTF_8_FILE_NAME);
     ToUTF8Action.ToUTF8Config config = new ToUTF8Action.ToUTF8Config(iso88591File.getFile(),
                                                                      destFolder.getPath() + UTF_8_FILE_NAME,
                                                                      null, "ISO-8859-1", false);
