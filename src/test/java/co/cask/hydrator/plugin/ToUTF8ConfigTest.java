@@ -35,8 +35,8 @@ import static org.junit.Assert.assertEquals;
  * Unit tests for {@link ToUTF8Action.ToUTF8Config}
  */
 public class ToUTF8ConfigTest {
-  private static final String ISO_8859_FILE_NAME = "/20150320_clo_prod_cln.dat";
-  private static final String UTF_8_FILE_NAME = "/20150320_clo_prod_cln.dat.utf8";
+  private static final String ISO_8859_FILE_NAME = "20150320_clo_prod_cln.dat";
+  private static final String UTF_8_FILE_NAME = "20150320_clo_prod_cln.dat.utf8";
 
   private FileFilter filter = new FileFilter() {
     private final Pattern pattern = Pattern.compile("[^\\.].*\\.utf8");
@@ -52,23 +52,23 @@ public class ToUTF8ConfigTest {
 
   @Test
   public void testSingleFile() throws Exception {
-    URL iso88591File = this.getClass().getResource(ISO_8859_FILE_NAME);
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL iso88591File = classLoader.getResource(ISO_8859_FILE_NAME);
     File destFolder = temporaryFolder.newFolder();
-    System.out.println("Source Path: " + iso88591File.getFile());
-    System.out.println("Dest Path: " + destFolder.getPath() + UTF_8_FILE_NAME);
     ToUTF8Action.ToUTF8Config config = new ToUTF8Action.ToUTF8Config(iso88591File.getFile(),
-                                                                     destFolder.getPath() + UTF_8_FILE_NAME,
+                                                                     destFolder.getPath() + "/" + UTF_8_FILE_NAME,
                                                                      null, "ISO-8859-1", false);
     MockPipelineConfigurer configurer = new MockPipelineConfigurer(null);
     new ToUTF8Action(config).configurePipeline(configurer);
     new ToUTF8Action(config).run(null);
     assertEquals(1, destFolder.listFiles(filter).length);
-    assertEquals(UTF_8_FILE_NAME, "/" + destFolder.listFiles(filter)[0].getName());
+    assertEquals(UTF_8_FILE_NAME, destFolder.listFiles(filter)[0].getName());
   }
 
   @Test
   public void testFolder() throws Exception {
-    URL iso88591File = this.getClass().getResource(ISO_8859_FILE_NAME);
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL iso88591File = classLoader.getResource(ISO_8859_FILE_NAME);
 
     File destFolder = temporaryFolder.newFolder();
     ToUTF8Action.ToUTF8Config config = new ToUTF8Action.ToUTF8Config(new File(iso88591File.getFile()).getParent(),
@@ -78,12 +78,13 @@ public class ToUTF8ConfigTest {
     new ToUTF8Action(config).configurePipeline(configurer);
     new ToUTF8Action(config).run(null);
     assertEquals(1, destFolder.listFiles(filter).length);
-    assertEquals(UTF_8_FILE_NAME, "/" + destFolder.listFiles(filter)[0].getName());
+    assertEquals(UTF_8_FILE_NAME, destFolder.listFiles(filter)[0].getName());
   }
 
   @Test
   public void testFolderWithGlob() throws Exception {
-    URL iso88591File = this.getClass().getResource(ISO_8859_FILE_NAME);
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL iso88591File = classLoader.getResource(ISO_8859_FILE_NAME);
 
     File destFolder = temporaryFolder.newFolder();
     ToUTF8Action.ToUTF8Config config =
@@ -94,12 +95,13 @@ public class ToUTF8ConfigTest {
     new ToUTF8Action(config).configurePipeline(configurer);
     new ToUTF8Action(config).run(null);
     assertEquals(1, destFolder.listFiles(filter).length);
-    assertEquals(UTF_8_FILE_NAME, "/" + destFolder.listFiles(filter)[0].getName());
+    assertEquals(UTF_8_FILE_NAME, destFolder.listFiles(filter)[0].getName());
   }
 
   @Test
   public void testFolderWithRegEx() throws Exception {
-    URL iso88591File = this.getClass().getResource(ISO_8859_FILE_NAME);
+    ClassLoader classLoader = getClass().getClassLoader();
+    URL iso88591File = classLoader.getResource(ISO_8859_FILE_NAME);
 
     File destFolder = temporaryFolder.newFolder();
     ToUTF8Action.ToUTF8Config config = new ToUTF8Action.ToUTF8Config(new File(iso88591File.getFile()).getParent(),
@@ -109,6 +111,6 @@ public class ToUTF8ConfigTest {
     new ToUTF8Action(config).configurePipeline(configurer);
     new ToUTF8Action(config).run(null);
     assertEquals(1, destFolder.listFiles(filter).length);
-    assertEquals(UTF_8_FILE_NAME, "/" + destFolder.listFiles(filter)[0].getName());
+    assertEquals(UTF_8_FILE_NAME, destFolder.listFiles(filter)[0].getName());
   }
 }
