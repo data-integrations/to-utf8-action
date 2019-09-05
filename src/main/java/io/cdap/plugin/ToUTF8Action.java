@@ -23,9 +23,12 @@ import io.cdap.cdap.api.annotation.Name;
 import io.cdap.cdap.api.annotation.Plugin;
 import io.cdap.cdap.api.common.Bytes;
 import io.cdap.cdap.api.plugin.PluginConfig;
+import io.cdap.cdap.etl.api.FailureCollector;
 import io.cdap.cdap.etl.api.PipelineConfigurer;
+import io.cdap.cdap.etl.api.StageConfigurer;
 import io.cdap.cdap.etl.api.action.Action;
 import io.cdap.cdap.etl.api.action.ActionContext;
+import io.cdap.cdap.etl.api.validation.ValidationException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -63,14 +66,15 @@ public class ToUTF8Action extends Action {
   }
 
   @Override
-  public void configurePipeline(PipelineConfigurer pipelineConfigurer) throws IllegalArgumentException {
+  public void configurePipeline(PipelineConfigurer pipelineConfigurer) {
     super.configurePipeline(pipelineConfigurer);
-    config.validate();
+    StageConfigurer stageConfigurer = pipelineConfigurer.getStageConfigurer();
+    config.validate(stageConfigurer.getFailureCollector());
   }
 
   @Override
   public void run(ActionContext context) throws Exception {
-    config.validate();
+    config.validate(context.getFailureCollector());
     Path source = new Path(config.sourceFilePath);
     Path dest = new Path(config.destFilePath);
 
@@ -83,7 +87,7 @@ public class ToUTF8Action extends Action {
     } else {
       // Convert all the files in a directory
       PathFilter filter = new PathFilter() {
-        private final Pattern pattern = Pattern.compile(config.fileRegex);
+        private final Pattern pattern = Pattern.compile(config.getFileRegex());
 
         @Override
         public boolean accept(Path path) {
@@ -98,7 +102,7 @@ public class ToUTF8Action extends Action {
 
       if (listFiles.length == 0) {
         LOG.warn("Not converting any files from source {} matching regular expression",
-                 source.toString(), config.fileRegex);
+                 source.toString(), config.getFileRegex());
       }
 
       if (fileSystem.exists(dest) && fileSystem.isFile(dest)) {
@@ -133,7 +137,7 @@ public class ToUTF8Action extends Action {
       out.flush();
       out.close();
     } catch (IOException e) {
-      if (!config.continueOnError) {
+      if (!config.getContinueOnError()) {
         throw new IOException(String.format("Failed to convert file %s to %s", source.toString(), dest.toString()));
       }
       LOG.warn(String.format("Exception convert file %s to %s", source.toString(), dest.toString()), e);
@@ -144,18 +148,28 @@ public class ToUTF8Action extends Action {
    * Config class that contains all properties required for running the unload command.
    */
   public static class ToUTF8Config extends PluginConfig {
+
+    public static final String SOURCE_FILE_PATH = "sourceFilePath";
+    public static final String DEST_FILE_PATH = "destFilePath";
+    public static final String FILE_REGEX = "fileRegex";
+    public static final String CHARSET = "charset";
+
+    @Name(SOURCE_FILE_PATH)
     @Macro
     @Description("The source location where the file or files live. You can use glob syntax here such as *.dat.")
     private String sourceFilePath;
 
+    @Name(DEST_FILE_PATH)
     @Macro
     @Description("The destination location where the converted files should be.")
     private String destFilePath;
 
+    @Name(CHARSET)
     @Macro
     @Description("The source charset.")
     private String charset;
 
+    @Name(FILE_REGEX)
     @Macro
     @Nullable
     @Description("A regular expression for filtering files such as .*\\.txt")
@@ -166,6 +180,13 @@ public class ToUTF8Action extends Action {
     @Description("Set to true if this plugin should ignore errors.")
     private Boolean continueOnError;
 
+    public String getFileRegex() {
+      return (Strings.isNullOrEmpty(fileRegex)) ? ".*" : fileRegex;
+    }
+
+    public boolean getContinueOnError() {
+      return continueOnError == null ? false : continueOnError;
+    }
 
     public ToUTF8Config(String sourceFilePath, String destFilePath, @Nullable String fileRegex,
                         String charset, @Nullable Boolean continueOnError) {
@@ -179,31 +200,38 @@ public class ToUTF8Action extends Action {
     /**
      * Validates the config parameters required for unloading the data.
      */
-    private void validate() throws IllegalArgumentException {
-      try {
-        Charset.forName(charset);
-      } catch (UnsupportedCharsetException e) {
-        throw new IllegalArgumentException("The charset entered is not valid. Please use a value " +
-                     "from https://docs.oracle.com/javase/8/docs/technotes/guides/intl/encoding.doc.html.", e);
-      }
-      try {
-        Pattern.compile(fileRegex);
-      } catch (Exception e) {
-        throw new IllegalArgumentException("The regular expression pattern provided is not a valid " +
-                                             "regular expression.", e);
-      }
+    private void validate(FailureCollector collector) throws ValidationException {
       if (Strings.isNullOrEmpty(sourceFilePath)) {
-        throw new IllegalArgumentException("Source file or folder is required.");
-      }
-      if (Strings.isNullOrEmpty(destFilePath)) {
-        throw new IllegalArgumentException("Destination file or folder is required.");
+        collector.addFailure("Source file or folder is required.", "Set source file or folder.")
+          .withConfigProperty(SOURCE_FILE_PATH);
+        collector.getOrThrowException();
       }
       try {
         Path source = new Path(sourceFilePath);
-        FileSystem fileSystem = source.getFileSystem(new Configuration());
+        source.getFileSystem(new Configuration());
       } catch (IOException e) {
-        throw new IllegalArgumentException("Cannot determine the file system of the source file.", e);
+        collector.addFailure("Cannot determine the file system of the source file.", null)
+          .withConfigProperty(SOURCE_FILE_PATH).withStacktrace(e.getStackTrace());
       }
+      if (Strings.isNullOrEmpty(destFilePath)) {
+        collector.addFailure("Destination file or folder is required.",
+                             "Set destination file or folder.").withConfigProperty(DEST_FILE_PATH);
+      }
+      try {
+        Pattern.compile(getFileRegex());
+      } catch (Exception e) {
+        collector.addFailure("The regular expression pattern provided is not a valid " +
+                               "regular expression.", "Set correct regular expression pattern.")
+          .withConfigProperty(FILE_REGEX);
+      }
+      try {
+        Charset.forName(charset);
+      } catch (UnsupportedCharsetException e) {
+        collector.addFailure(e.getMessage(), "The charset entered is not valid. Please use a value " +
+          "from https://docs.oracle.com/javase/8/docs/technotes/guides/intl/encoding.doc.html.")
+          .withConfigProperty(CHARSET);
+      }
+      collector.getOrThrowException();
     }
   }
 }
