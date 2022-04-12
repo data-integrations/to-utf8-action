@@ -71,7 +71,7 @@
     <guava.version>19.0</guava.version>
     <redshift-jdbc.version>1.2.1.1001</redshift-jdbc.version>
     <junit.version>4.11</junit.version>
-    <hadoop.version>2.6.0</hadoop.version>
+    <hadoop.version>3.2.3</hadoop.version>
     <!-- properties for script build step that creates the config files for the artifacts -->
     <widgets.dir>widgets</widgets.dir>
     <docs.dir>docs</docs.dir>
